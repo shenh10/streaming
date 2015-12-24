@@ -6,7 +6,7 @@ import asyncore
 import signal
 import pdb
 class Master(object):
-    def __init__(self, addr , port , task):
+    def __init__(self, addr , port , task, url):
         self.task_queue = deque(task)
         self.N = len(task)
         self.done = 0
@@ -14,6 +14,8 @@ class Master(object):
         self.lookup = {}
         self.address = addr
         self.port = port
+        self.index = url
+        self.index_dict = {}
         self.event = Event()
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -107,6 +109,18 @@ class Master(object):
                 for slave in self.conn_list:
                     if  slave not in self.lookup:
                        self.lookup[slave] = deque([])
+                       read_sockets,write_sockets,error_sockets = select.select([], [slave],[], 0)
+                       for sock in write_sockets:
+                           print 'Ask client to download index file'
+                           self.sock_lock[sock].acquire()
+                           sock.send('INDEX!%s'%self.index)
+                           data = sock.recv(self.recv_buffer) 
+                           self.sock_lock[sock].release()
+                           if data.startswith('ACC!SUCCESS'):
+                                continue
+                           else:
+                                print "Error to push index file"
+                                self.stop = 1
                 if len(self.lookup.keys()) == 0:
                     continue
                 (min_slave, min_val) = self.get_smallest_length(self.lookup)[0] 

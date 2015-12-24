@@ -17,7 +17,7 @@ def load_m3u8(url):
                 file_list = load_m3u8(playlist.uri)
             else:
                 sub_url = urljoin(url, playlist.uri)
-                file_list = load_m3u8(sub_url)
+                url, file_list = load_m3u8(sub_url)
 
     else:
         segments =  m3u8_obj.segments
@@ -28,29 +28,33 @@ def load_m3u8(url):
             else:
                 seg_url = urljoin(url, segment.uri)
                 file_list.append(seg_url)
-    return file_list
+    return  url, file_list
 
 def get_opts():
     parser = argparse.ArgumentParser(description="Thanks for using MircoDownloader")
     parser.add_argument("-p", "--port", help="port on listening", required = True)
     parser.add_argument("-a", "--addr", help="address on listening", required=True)
+    _input = parser.add_argument("-i", "--input", help="m3u8 file source")
     repo = parser.add_argument("-r", "--repo", help="repo to store the downloaded file")
+    parser.add_argument("-c", "--clients", help="points out all sibling slaves to syncup.")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("-m", "--master",help="run the script as master", action="store_true")
     group.add_argument("-s", "--slave",help="run the script as slave", action='store_true')
     args = parser.parse_args()
     if args.slave and args.repo is None:
          parser.error('If run in slave mode, repo is neccessary to be given.')
+    if args.master and ( args.input is None ):
+         parser.error('If run in master mode, stream source(-i) is neccessary to be given.')
     return args
 
 if __name__ == '__main__':
     args = get_opts()
     if args.master == True:
-        file_list = load_m3u8('http://127.0.0.1:8080/all.m3u8')
+        url, file_list = load_m3u8(args.input)
         print len(file_list)
-        master = Master(args.addr, int(args.port), file_list)
+        master = Master(args.addr, int(args.port), file_list, url)
         master.run()
     else:
-        slave = Slave(args.addr, int(args.port), args.repo)
+        slave = Slave(args.addr, int(args.port), args.repo, [args.clients])
         slave.run()
     
