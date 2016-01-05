@@ -16,7 +16,7 @@ class Slave(object):
         self.buffer_size = 2048
         self.repo = repo
         self.download_thread = Thread(target = self.downloader)
-        self.sibling_ip = sibling_ip
+        self.sibling_ip = sibling_ip.split(",")
         self.socket_lock = Lock()
         self.stop = 0
         self.count = 0

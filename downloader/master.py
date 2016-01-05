@@ -17,9 +17,11 @@ class Master(object):
         self.index = url
         self.index_dict = {}
         self.event = Event()
+        self.nc_event = Event()
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.conn_list = deque([])
+        self.conn_list_lock = Lock()
         self.recv_buffer = 2048
         self.server_thread = Thread(target = self.server_executor)
         self.event_thread = Thread(target = self.event_listener)
@@ -62,14 +64,19 @@ class Master(object):
         print >>sys.stderr, 'starting up on %s port %s' % self.sock.getsockname()
         self.sock.listen(10)
         while not self.stop:
+            self.conn_list_lock.acquire()
             l = list(self.conn_list) 
+            self.conn_list_lock.release()
             read_sockets,write_sockets,error_sockets = select.select(l + [ self.sock ],[],[], 0)
             for sock in read_sockets:
                 if sock == self.sock:
                     sockfd, addr = self.sock.accept()
+                    self.conn_list_lock.acquire()
                     self.conn_list.append(sockfd)
+                    self.conn_list_lock.release()
                     self.sock_lock[sockfd] = Lock()
                     print "Client (%s, %s) connected" % addr
+                    if not self.nc_event.is_set(): self.nc_event.set()
                 else:
                     try:
                         self.sock_lock[sock].acquire()
@@ -86,7 +93,7 @@ class Master(object):
                         self.conn_list.remove(sock)
                         continue
         for conn in self.conn_list:
-            conn.send('CLOSE')
+            #conn.send('CLOSE')
             conn.close()
         self.sock.close()
 
@@ -106,6 +113,7 @@ class Master(object):
                     break
                 if not self.task_queue:
                     continue
+                self.conn_list_lock.acquire()
                 for slave in self.conn_list:
                     if  slave not in self.lookup:
                        self.lookup[slave] = deque([])
@@ -121,9 +129,11 @@ class Master(object):
                            else:
                                 print "Error to push index file"
                                 self.stop = 1
+                self.conn_list_lock.release()
                 if len(self.lookup.keys()) == 0:
                     continue
                 (min_slave, min_val) = self.get_smallest_length(self.lookup)[0] 
+                print "Start assigning jobs..."
                 if min_val < self.K:
                     url = self.task_queue.popleft()
                     read_sockets,write_sockets,error_sockets = select.select([], [min_slave],[], 0)
@@ -140,13 +150,19 @@ class Master(object):
                                 self.task_queue.append(url)
                             self.sock_lock[sock].release()
                 else:
+                    if self.nc_event.is_set():
+                        self.nc_event.clear()
                     print 'Too many task assigned , waiting...'
-                    while not self.stop and not self.event.wait(.1):
+                    while not self.stop and not self.event.wait(.1) and not self.nc_event.wait(.1):
                         pass
-                    self.func_lock.acquire()
-                    self.handle_response()
-                    self.event.clear()
-                    self.func_lock.release()
+                    if self.event.is_set():
+                        self.func_lock.acquire()
+                        self.handle_response()
+                        self.event.clear()
+                        self.func_lock.release()
+                    if self.nc_event.is_set():
+                        self.nc_event.clear()
+                        continue
             self.stop = 1
             print 'All task done... Exit from Downloader'
             while self.server_thread.is_alive():
@@ -155,6 +171,7 @@ class Master(object):
                 self.event_thread.join(.1)
 
         except :
+            print "Exception in run()"
             self.stop = 1
             while self.server_thread.is_alive():
                 self.server_thread.join(.1)

@@ -55,6 +55,6 @@ if __name__ == '__main__':
         master = Master(args.addr, int(args.port), file_list, url)
         master.run()
     else:
-        slave = Slave(args.addr, int(args.port), args.repo, [args.clients])
+        slave = Slave(args.addr, int(args.port), args.repo, args.clients)
         slave.run()
     
