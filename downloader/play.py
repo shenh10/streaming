@@ -1,6 +1,9 @@
 import subprocess, os, time
 import m3u8
 from urlparse import urljoin
+"""
+The file is to play video segments continously through pipe on Raspberry PI
+"""
 def load_m3u8(url):
     m3u8_obj = m3u8.load(url)
     file_list = []

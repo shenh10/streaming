@@ -4,4 +4,21 @@ It implements a cooperative HTTP video streaming architecture based on Paper [Mi
 
 
 ### MircoDownloader
-TBD
+Implement a cooperative downloader which utilizes bandwidth inside a local p2p network. Tested with 3G for downloading and WIFI for local transmission. Working much faster than 3G along for each participants. 
+
+- downloader.py: wrapper for both master and slave
+- master.py: download master for scheduling
+- slave.py : actually worker for downloading
+
+
+### Run Example
+- Run Master
+``` bash
+python downloader.py -a [ip] -p [port] -m -i "http://$source_ip:$port/all.m3u8"
+
+```
+
+- Run slave
+``` bash
+python downloader.py -a [ip] -p [port] -s -r [path/to/repo] -c ['ip1,ip2']
+```

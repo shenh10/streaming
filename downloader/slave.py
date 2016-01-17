@@ -7,10 +7,29 @@ import time
 import subprocess
 class Slave(object):
     def __init__(self, server_address, server_port, repo, sibling_ip):
+        """
+        Queues:
+            task_list: Tasks waiting to be execute
+        Threads:
+            run(main thread): Listen on message from server
+            downloader(download_thread): Thread to download video segment and send notification to master when downloaded
+            sibling_ip(Process): siblings' IPs to push video segments it downloaded. Using subprocess to call file transferrer from command line
+        Others:
+            address/port: master IP address and port on listening
+            sock: the client socket handle
+            buffer_size: recieve buffer size
+            repo: directory to store downloaded video segments
+            stop: stop sign for error occurance or task complete
+            count: Task number the client has completed
+        Some primitive signals defined between master and slave:
+            DOWNLOAD!{url}: download task command
+            SUCCESS!{url}/FAILURE!{url}: signal for downloaded status 
+            ACC!SUCCESS/ACC!FAILURE: Synchronous communicate handshake response
+            INDEX!{url}: m3u8 index file
+        """
         self.task_list = deque([])
         self.server_address = server_address
         self.server_port = server_port
-        print server_address, server_port
         self.sock = socket.create_connection((server_address, server_port))
         #self.message = message
         self.buffer_size = 2048
